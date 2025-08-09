@@ -1,16 +1,14 @@
-// src/services/balancaService.js
+// C:\code\moradafish\src\services\balancaService.js
 
-/**
- * Objeto para gerenciar a conexão com a balança de forma persistente.
- * Ele abre a porta e inicia um loop de leitura para interpretar os dados da balança.
- */
 const balancaManager = {
   port: null,
   reader: null,
-  keepReading: true,
+  writer: null,
+  keepReading: false,
   textDecoder: new TextDecoder(),
   buffer: '',
   resolveCurrentRead: null,
+  timeout: 8000, // 8 segundos
 
   async connect() {
     if (this.port) {
@@ -18,26 +16,52 @@ const balancaManager = {
       return true;
     }
     try {
-      console.log("Solicitando porta serial...");
+      console.log("Solicitando porta serial para balança...");
       this.port = await navigator.serial.requestPort();
-      await this.port.open({ baudRate: 9600 });
-      console.log("Balança conectada com sucesso!");
+
+      const correctConfig = { baudRate: 9600, dataBits: 8, parity: 'none' };
+      console.log("[Balança] Conectando com a configuração correta:", correctConfig);
+      await this.port.open(correctConfig);
+
+      console.log("[Balança] Conexão bem-sucedida!");
+
+      this.writer = this.port.writable.getWriter();
+
+      await this.port.setSignals({ dataTerminalReady: true, requestToSend: true });
+      console.log("[Balança] Sinais DTR e RTS ativados.");
 
       this.keepReading = true;
       this.startReadingLoop();
-
       return true;
+
     } catch (err) {
-      console.error("Erro ao conectar com a balança:", err.message);
+      console.error("Erro final ao conectar com a balança:", err.message);
       if (err.name !== 'NotFoundError') {
-        alert("Não foi possível conectar à balança. Verifique se ela está conectada e se não está sendo usada por outro programa.");
+        alert("Não foi possível conectar à balança. Verifique o cabo, driver CH34x e se não está sendo usada por outro programa.");
       }
       this.port = null;
       return false;
     }
   },
 
+  async solicitarPeso() {
+    const comando = 'P';
+    if (!this.writer) {
+      console.error("[Balança] O escritor da porta serial não está disponível.");
+      return;
+    }
+    try {
+      console.log(`[Balança] Enviando comando de solicitação de peso ('${comando}')...`);
+      const encoder = new TextEncoder();
+      await this.writer.write(encoder.encode(comando));
+    } catch (error) {
+      console.error("[Balança] Erro ao enviar comando para a balança:", error);
+    }
+  },
+
+  // MÉTODO PRINCIPAL DE LEITURA COM DEBUG
   async startReadingLoop() {
+    if (!this.port) return;
     this.reader = this.port.readable.getReader();
 
     while (this.port && this.keepReading) {
@@ -45,46 +69,57 @@ const balancaManager = {
         const { value, done } = await this.reader.read();
         if (done) break;
 
-        this.buffer += this.textDecoder.decode(value, { stream: true });
+        const arr = Array.from(value);
+        console.log('[Balança] Bytes brutos recebidos (Uint8Array):', arr);
 
-        // *** LÓGICA ATUALIZADA PARA O FORMATO REAL DA BALANÇA ***
-        // Procura pelo padrão "=ph" seguido por 12 dígitos. Ex: "=ph000125000000"
-        const match = this.buffer.match(/=ph(\d{12})/);
-        
-        if (match && match[1]) {
-          const capturedString = match[1]; // Ex: "000125000000"
-          
-          // Interpreta a string como um peso no formato XXXX.XXX kg
-          // Pega os 4 primeiros dígitos para a parte inteira e os 3 seguintes para a decimal.
-          const integerPart = capturedString.substring(0, 4);
-          const fractionalPart = capturedString.substring(4, 7);
-          const weightString = `${integerPart}.${fractionalPart}`; // Ex: "0001.250"
-          
-          const weight = parseFloat(weightString); // Converte para número: 1.25
-          
-          console.log(`Peso interpretado: ${weight} kg`);
+        // NOVO PARSER TESTE
+        const b10 = arr[10];
+        const b11 = arr[11];
+        const b9 = arr[9];
+        const b8 = arr[8];
+        const b7 = arr[7];
 
-          if (this.resolveCurrentRead) {
-            this.resolveCurrentRead(weight);
+        const peso_le = ((b11 << 8) | b10) / 1000;
+        const peso_be = ((b10 << 8) | b11) / 1000;
+        const peso_1 = b10 / 1000;
+        const peso_3 = ((b9 << 16) | (b10 << 8) | b11) / 1000;
+
+        console.log(`[PARSER TESTE] Peso só b10: ${peso_1} kg`);
+        console.log(`[PARSER TESTE] Peso b10/b11 little-endian: ${peso_le} kg`);
+        console.log(`[PARSER TESTE] Peso b10/b11 big-endian: ${peso_be} kg`);
+        console.log(`[PARSER TESTE] Peso b9,b10,b11: ${peso_3} kg`);
+
+        if (this.resolveCurrentRead) {
+          if (peso_le > 0 && peso_le < 100) {
+            this.resolveCurrentRead(peso_le);
+            this.resolveCurrentRead = null;
+          } else if (peso_be > 0 && peso_be < 100) {
+            this.resolveCurrentRead(peso_be);
+            this.resolveCurrentRead = null;
+          } else if (peso_1 > 0 && peso_1 < 5) {
+            this.resolveCurrentRead(peso_1);
             this.resolveCurrentRead = null;
           }
-          // Limpa o buffer para aguardar o próximo pacote de dados completo
-          this.buffer = ''; 
         }
 
-        // Medida de segurança para não deixar o buffer crescer infinitamente
         if (this.buffer.length > 200) {
-            this.buffer = this.buffer.slice(this.buffer.length - 100);
+          this.buffer = this.buffer.slice(this.buffer.length - 100);
         }
       } catch (error) {
-        console.error("Erro no loop de leitura da balança:", error);
-        this.keepReading = false; // Para o loop em caso de erro
+        if (error.message && error.message.includes('device has been lost')) {
+          alert("A balança foi desconectada do computador. Verifique o cabo USB e conecte novamente.");
+        } else {
+          console.error("[Balança] Erro no loop de leitura da balança:", error);
+        }
+        this.keepReading = false;
+        await this.disconnect();
+        break;
       }
     }
-    
-    if(this.reader) {
-        this.reader.releaseLock();
-        this.reader = null;
+
+    if (this.reader) {
+      try { await this.reader.releaseLock(); } catch {}
+      this.reader = null;
     }
     console.log("Loop de leitura da balança encerrado.");
   },
@@ -94,7 +129,7 @@ const balancaManager = {
       const timeoutId = setTimeout(() => {
         this.resolveCurrentRead = null;
         reject(new Error("Tempo de leitura da balança esgotado."));
-      }, 5000); // Timeout de 5 segundos
+      }, this.timeout);
 
       this.resolveCurrentRead = (weight) => {
         clearTimeout(timeoutId);
@@ -104,31 +139,50 @@ const balancaManager = {
   },
 
   async disconnect() {
+    this.keepReading = false;
+    if (this.writer) {
+      try { await this.writer.releaseLock(); } catch {}
+      this.writer = null;
+    }
     if (this.reader) {
-      this.keepReading = false;
-      await this.reader.cancel();
+      try { await this.reader.cancel(); } catch {}
     }
     if (this.port) {
-      await this.port.close();
+      try { await this.port.setSignals({ dataTerminalReady: false, requestToSend: false }); } catch {}
+      try { await this.port.close(); } catch {}
       this.port = null;
-      console.log("Balança desconectada.");
+      console.log("[Balança] Desconectada.");
     }
+  },
+
+  async reconnect() {
+    await this.disconnect();
+    return await this.connect();
   }
 };
 
 export const lerPesoDaBalanca = async () => {
+  if (!navigator.serial) {
+    alert("Seu navegador não suporta conexão com porta serial! Use o Chrome ou Edge mais recente.");
+    return null;
+  }
   if (!balancaManager.port) {
     const connected = await balancaManager.connect();
     if (!connected) return null;
   }
-
   try {
-    console.log("Aguardando peso da balança...");
-    const peso = await balancaManager.readOnce();
-    return peso;
+    await balancaManager.solicitarPeso();
+    console.log("[Balança] Aguardando leitura...");
+    return await balancaManager.readOnce();
   } catch (error) {
-    console.error(error.message);
-    alert("Não foi possível ler o peso. Tente novamente ou verifique a conexão da balança.");
+    if (error.message && error.message.toLowerCase().includes('device')) {
+      await balancaManager.disconnect();
+      alert("Balança desconectada. Reconecte o cabo e tente novamente.");
+    } else {
+      alert(error.message + "\nVerifique se a balança está conectada e se o item está estável.");
+    }
     return null;
   }
 };
+
+export default balancaManager;

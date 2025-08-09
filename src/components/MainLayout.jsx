@@ -1,3 +1,4 @@
+// C:\code\moradafish\src\components\MainLayout.jsx
 import React, { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
@@ -18,10 +19,10 @@ const CloseIcon = (props) => (
 );
 
 function MainLayout({ user }) {
-  const [isSidebarOpen, setSidebarOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const handleLogout = () => {
-    signOut(auth).catch((error) => console.error("Erro no logout:", error));
+    signOut(auth).catch((error) => console.error('Erro no logout:', error));
   };
 
   const activeLinkStyle = {
@@ -29,99 +30,179 @@ function MainLayout({ user }) {
     color: 'white',
   };
 
+  const navLinkBase =
+    'px-3 py-2 rounded-lg text-sm font-medium transition hover:bg-gray-700 hover:text-white';
+
   return (
-    <div className="relative min-h-screen md:flex">
-      {/* Overlay para fechar o menu em mobile */}
-      {isSidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black opacity-50 z-20 md:hidden"
-          onClick={() => setSidebarOpen(false)}
-        ></div>
-      )}
+    <div className="min-h-screen flex flex-col bg-gray-50">
+      {/* NAV SUPERIOR */}
+      <header className="w-full bg-gray-800 text-gray-200 shadow-md sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="h-16 flex items-center justify-between">
+            {/* Branding + Botão mobile */}
+            <div className="flex items-center gap-3">
+              <button
+                className="md:hidden text-gray-300 hover:text-white focus:outline-none"
+                onClick={() => setIsMenuOpen((v) => !v)}
+                aria-label={isMenuOpen ? 'Fechar menu' : 'Abrir menu'}
+              >
+                {isMenuOpen ? <CloseIcon className="h-7 w-7" /> : <MenuIcon className="h-7 w-7" />}
+              </button>
+              <span className="text-xl sm:text-2xl font-extrabold text-white select-none">
+                Morada Fish
+              </span>
+            </div>
 
-      {/* Menu Lateral */}
-      <aside
-        className={`
-          fixed inset-y-0 left-0 bg-gray-800 text-gray-200 w-64 p-4 z-30 
-          transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} 
-          md:relative md:translate-x-0 transition-transform duration-200 ease-in-out
-          flex flex-col justify-between
-        `}
-        aria-expanded={isSidebarOpen}
-      >
-        {/* Cabeçalho do menu lateral */}
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-extrabold text-white">Morada Fish</h2>
-          <button
-            className="md:hidden text-gray-400 hover:text-white focus:outline-none"
-            onClick={() => setSidebarOpen(false)}
-            aria-label="Fechar menu lateral"
-          >
-            <CloseIcon className="h-6 w-6" />
-          </button>
+            {/* Links (desktop) */}
+            <nav className="hidden md:flex items-center gap-2">
+              <NavLink
+                to="/"
+                end
+                style={({ isActive }) => (isActive ? activeLinkStyle : undefined)}
+                className={navLinkBase}
+              >
+                Início
+              </NavLink>
+
+              <NavLink
+                to="/producao"
+                style={({ isActive }) => (isActive ? activeLinkStyle : undefined)}
+                className={navLinkBase}
+              >
+                Produção
+              </NavLink>
+
+              <NavLink
+                to="/cadastros"
+                style={({ isActive }) => (isActive ? activeLinkStyle : undefined)}
+                className={navLinkBase}
+              >
+                Cadastros
+              </NavLink>
+
+              <NavLink
+                to="/entrada-rendimento"
+                style={({ isActive }) => (isActive ? activeLinkStyle : undefined)}
+                className={navLinkBase}
+              >
+                Entrada de Rendimento
+              </NavLink>
+
+              <NavLink
+                to="/teste-escamacao"
+                style={({ isActive }) => (isActive ? activeLinkStyle : undefined)}
+                className={navLinkBase}
+              >
+                Teste de Escamação
+              </NavLink>
+
+              {/* Nova aba */}
+              <NavLink
+                to="/rend-filetador-excel"
+                style={({ isActive }) => (isActive ? activeLinkStyle : undefined)}
+                className={navLinkBase}
+              >
+                Rend. filetador (excel)
+              </NavLink>
+            </nav>
+
+            {/* Usuário + Sair (desktop) */}
+            <div className="hidden md:flex items-center gap-3">
+              <p className="text-xs text-gray-300 truncate max-w-[220px]" title={user?.email}>
+                {user?.email}
+              </p>
+              <button
+                onClick={handleLogout}
+                className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-400"
+              >
+                Sair
+              </button>
+            </div>
+          </div>
         </div>
 
-        {/* Links de navegação */}
-        <nav className="space-y-2 flex-1">
-          <NavLink
-            to="/"
-            end
-            style={({ isActive }) => isActive ? activeLinkStyle : undefined}
-            className="block py-3 px-4 rounded-lg text-base font-medium transition hover:bg-gray-700 hover:text-white"
-            onClick={() => setSidebarOpen(false)}
-          >
-            Início
-          </NavLink>
-          <NavLink
-            to="/producao"
-            style={({ isActive }) => isActive ? activeLinkStyle : undefined}
-            className="block py-3 px-4 rounded-lg text-base font-medium transition hover:bg-gray-700 hover:text-white"
-            onClick={() => setSidebarOpen(false)}
-          >
-            Produção
-          </NavLink>
-          <NavLink
-            to="/cadastros"
-            style={({ isActive }) => isActive ? activeLinkStyle : undefined}
-            className="block py-3 px-4 rounded-lg text-base font-medium transition hover:bg-gray-700 hover:text-white"
-            onClick={() => setSidebarOpen(false)}
-          >
-            Cadastros
-          </NavLink>
-        </nav>
+        {/* Menu dropdown (mobile) */}
+        {isMenuOpen && (
+          <div className="md:hidden border-t border-gray-700 bg-gray-800">
+            <nav className="px-4 py-3 space-y-2">
+              <NavLink
+                to="/"
+                end
+                onClick={() => setIsMenuOpen(false)}
+                style={({ isActive }) => (isActive ? activeLinkStyle : undefined)}
+                className="block px-3 py-2 rounded-lg text-base font-medium transition hover:bg-gray-700 hover:text-white"
+              >
+                Início
+              </NavLink>
 
-        {/* Rodapé do menu lateral */}
-        <div className="border-t border-gray-700 pt-4">
-          <p className="text-sm truncate" title={user?.email}>{user?.email}</p>
-          <button
-            onClick={handleLogout}
-            className="w-full mt-2 bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-400"
-          >
-            Sair
-          </button>
-        </div>
-      </aside>
+              <NavLink
+                to="/producao"
+                onClick={() => setIsMenuOpen(false)}
+                style={({ isActive }) => (isActive ? activeLinkStyle : undefined)}
+                className="block px-3 py-2 rounded-lg text-base font-medium transition hover:bg-gray-700 hover:text-white"
+              >
+                Produção
+              </NavLink>
 
-      {/* Conteúdo Principal */}
-      <div className="flex-1 flex flex-col">
-        {/* Cabeçalho superior para dispositivos móveis */}
-        <header className="md:hidden bg-white shadow-md p-4 flex justify-between items-center">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="text-gray-700 hover:text-black focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-            aria-label="Abrir menu lateral"
-          >
-            <MenuIcon className="h-8 w-8" />
-          </button>
-          <h1 className="text-xl font-semibold text-gray-800">Morada Fish</h1>
-          <div className="w-8" /> {/* Espaçador visual */}
-        </header>
+              <NavLink
+                to="/cadastros"
+                onClick={() => setIsMenuOpen(false)}
+                style={({ isActive }) => (isActive ? activeLinkStyle : undefined)}
+                className="block px-3 py-2 rounded-lg text-base font-medium transition hover:bg-gray-700 hover:text-white"
+              >
+                Cadastros
+              </NavLink>
 
-        {/* Área de conteúdo */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto bg-gray-50">
-          <Outlet />
-        </main>
-      </div>
+              <NavLink
+                to="/entrada-rendimento"
+                onClick={() => setIsMenuOpen(false)}
+                style={({ isActive }) => (isActive ? activeLinkStyle : undefined)}
+                className="block px-3 py-2 rounded-lg text-base font-medium transition hover:bg-gray-700 hover:text-white"
+              >
+                Entrada de Rendimento
+              </NavLink>
+
+              <NavLink
+                to="/teste-escamacao"
+                onClick={() => setIsMenuOpen(false)}
+                style={({ isActive }) => (isActive ? activeLinkStyle : undefined)}
+                className="block px-3 py-2 rounded-lg text-base font-medium transition hover:bg-gray-700 hover:text-white"
+              >
+                Teste de Escamação
+              </NavLink>
+
+              <NavLink
+                to="/rend-filetador-excel"
+                onClick={() => setIsMenuOpen(false)}
+                style={({ isActive }) => (isActive ? activeLinkStyle : undefined)}
+                className="block px-3 py-2 rounded-lg text-base font-medium transition hover:bg-gray-700 hover:text-white"
+              >
+                Rend. filetador (excel)
+              </NavLink>
+
+              <div className="mt-3 border-t border-gray-700 pt-3">
+                <p className="text-sm text-gray-300 truncate" title={user?.email}>
+                  {user?.email}
+                </p>
+                <button
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    handleLogout();
+                  }}
+                  className="mt-2 w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-400"
+                >
+                  Sair
+                </button>
+              </div>
+            </nav>
+          </div>
+        )}
+      </header>
+
+      {/* CONTEÚDO */}
+      <main className="flex-1 p-4 sm:p-6 lg:p-8">
+        <Outlet />
+      </main>
     </div>
   );
 }
