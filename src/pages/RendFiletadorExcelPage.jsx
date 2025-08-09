@@ -43,24 +43,50 @@ const norm = (s) =>
 const ALIAS = {
   data: ["data", "dt", "dia", "data do lancamento", "lancamento", "competencia"],
   filetador: [
-    "filetador","filetadores","colaborador","funcionario","operador","nome","nome do filetador","matricula","crachá","cracha","id",
+    "filetador",
+    "filetadores",
+    "colaborador",
+    "funcionario",
+    "operador",
+    "nome",
+    "nome do filetador",
+    "matricula",
+    "crachá",
+    "cracha",
+    "id",
   ],
   peixeSem: [
-    "peixe recebido sem escama (kg)","peixe recebido sem escama","peixe sem escama (kg)","peixe sem escama","entrada sem escama (kg)","peixe s/ escama (kg)",
+    "peixe recebido sem escama (kg)",
+    "peixe recebido sem escama",
+    "peixe sem escama (kg)",
+    "peixe sem escama",
+    "entrada sem escama (kg)",
+    "peixe s/ escama (kg)",
   ],
   fileProd: [
-    "file produzido (kg)","filé produzido (kg)","file produzido","producao file (kg)","saida file (kg)","producao de file (kg)",
+    "file produzido (kg)",
+    "filé produzido (kg)",
+    "file produzido",
+    "producao file (kg)",
+    "saida file (kg)",
+    "producao de file (kg)",
   ],
-  correcao: ["correcao","correção","ajuste","ajuste (kg)","corte","desconto"],
+  correcao: ["correcao", "correção", "ajuste", "ajuste (kg)", "corte", "desconto"],
   aprov: [
-    "% aprov. sem escamas","percentual aprovado sem escamas","aprov sem escamas","% aprovado sem escamas","% aprov sem escamas","aprovacao sem escamas",
+    "% aprov. sem escamas",
+    "percentual aprovado sem escamas",
+    "aprov sem escamas",
+    "% aprovado sem escamas",
+    "% aprov sem escamas",
+    "aprovacao sem escamas",
   ],
 };
 
 /* ----------------- Header helpers ----------------- */
 function findHeaderRow(rows) {
   // procura até 120 linhas e aceita o melhor score, mesmo que 1
-  let bestRow = 0, bestScore = -1;
+  let bestRow = 0,
+    bestScore = -1;
   for (let r = 0; r < rows.length && r < 120; r++) {
     const cells = (rows[r] || []).map((c) => norm(c));
     let score = 0;
@@ -71,7 +97,10 @@ function findHeaderRow(rows) {
     if (has(ALIAS.fileProd)) score++;
     if (has(ALIAS.correcao)) score++;
     if (has(ALIAS.aprov)) score++;
-    if (score > bestScore) { bestScore = score; bestRow = r; }
+    if (score > bestScore) {
+      bestScore = score;
+      bestRow = r;
+    }
     if (score >= 3) break; // achou um cabeçalho bom
   }
   return bestRow;
@@ -83,8 +112,14 @@ function mergeHeaderRows(rows, startIdx) {
   const len = Math.max(h1.length, h2.length, h3.length);
   const out = [];
   for (let i = 0; i < len; i++) {
-    const a = String(h1[i] ?? ""), b = String(h2[i] ?? ""), c = String(h3[i] ?? "");
-    const merged = [a, b, c].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+    const a = String(h1[i] ?? ""),
+      b = String(h2[i] ?? ""),
+      c = String(h3[i] ?? "");
+    const merged = [a, b, c]
+      .filter(Boolean)
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim();
     out.push(merged);
   }
   return out;
@@ -93,7 +128,11 @@ function buildColumnMap(headerCells) {
   const map = { data: -1, filetador: -1, peixeSem: -1, fileProd: -1, correcao: -1, aprov: -1 };
   const cells = headerCells.map((c) => norm(c));
   const setIdx = (key, aliases) => {
-    for (let i = 0; i < cells.length; i++) if (aliases.includes(cells[i])) { map[key] = i; return; }
+    for (let i = 0; i < cells.length; i++)
+      if (aliases.includes(cells[i])) {
+        map[key] = i;
+        return;
+      }
   };
   setIdx("data", ALIAS.data);
   setIdx("filetador", ALIAS.filetador);
@@ -105,18 +144,6 @@ function buildColumnMap(headerCells) {
 }
 
 /* ------------ Date helpers ------------ */
-function isDateLike(val) {
-  if (val instanceof Date && !isNaN(val)) return true;
-  if (typeof val === "string") {
-    const s = val.trim();
-    if (!s) return false;
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return true;
-    if (/^\d{2}[\/\-]\d{2}[\/\-]\d{2,4}$/.test(s)) return true;
-    return false;
-  }
-  if (typeof val === "number") return val >= 30000 && val <= 60000; // Excel serial
-  return false;
-}
 function excelNumToISO(n) {
   const d = XLSX.SSF.parse_date_code(n);
   if (!d || !d.y) return "";
@@ -125,7 +152,7 @@ function excelNumToISO(n) {
 }
 function anyToISO(v) {
   if (v instanceof Date && !isNaN(v)) return toISO(v);
-  if (typeof v === "number") return isDateLike(v) ? excelNumToISO(v) : "";
+  if (typeof v === "number") return excelNumToISO(v); // tratar sempre serial Excel quando vier número
   if (typeof v === "string") {
     const s = v.trim();
     if (!s) return "";
@@ -140,14 +167,17 @@ function anyToISO(v) {
         if (!isNaN(js)) return toISO(js);
       }
       return toISO(parseISO(s));
-    } catch { return ""; }
+    } catch {
+      return "";
+    }
   }
   return "";
 }
 
 /* ---------- Fuzzy helpers (para importar) ---------- */
 function lev(a, b) {
-  a = norm(a); b = norm(b);
+  a = norm(a);
+  b = norm(b);
   const m = Array.from({ length: a.length + 1 }, () => Array(b.length + 1).fill(0));
   for (let i = 0; i <= a.length; i++) m[i][0] = i;
   for (let j = 0; j <= b.length; j++) m[0][j] = j;
@@ -160,15 +190,17 @@ function lev(a, b) {
   return m[a.length][b.length];
 }
 function buildColabIndex(colaboradores) {
-  const byNome = {}; const list = [];
+  const byNome = {};
+  const list = [];
   colaboradores.forEach((raw) => {
     const c = {
       id: raw.id,
       nome: raw.nome ?? raw.Nome ?? raw.name ?? "",
       apelido: raw.apelido ?? raw.Apelido ?? raw.nickname ?? "",
-      matricula: String(raw.matricula ?? raw.Matricula ?? raw.codigo ?? raw.codigoBarras ?? "").trim(),
+      matricula: String(raw.matricula ?? raw.Matricula ?? raw.codigo ?? raw.codigoBarras ?? "")
+        .trim()
+        .replace(/^0+/, ""),
       funcao: raw.funcao ?? raw.função ?? raw.Funcao ?? raw["Função"] ?? "",
-      filetador: Boolean(norm(String(raw.funcao ?? "")).includes("filetador")),
     };
     list.push(c);
     if (c.nome) byNome[norm(c.nome)] = c;
@@ -176,15 +208,41 @@ function buildColabIndex(colaboradores) {
   return { byNome, list };
 }
 function resolveColaborador(raw, index) {
-  const s = norm(String(raw || ""));
+  // normaliza e remove prefixos/ruídos comuns ("Filetador Fulano", etc.)
+  let s = norm(String(raw || ""));
   if (!s) return null;
+  s = s
+    .replace(
+      /^(filetador(a)?|operador(a)? de filet(agem)?|filetagem|fil(e|é)to(r|ra)|fil(e|é))[:\- ]*/i,
+      ""
+    )
+    .replace(/\((.*?)\)/g, " ") // remove parenteses (ex. matrícula)
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  // 1) match exato
   if (index.byNome[s]) return index.byNome[s];
-  let best = null, bestD = 3;
-  index.list.forEach((c) => {
-    const d1 = lev(s, c.nome || "");
-    if (d1 < bestD) { bestD = d1; best = c; }
-  });
-  return bestD <= 2 ? best : null;
+
+  // 2) contém/é contido
+  for (const c of index.list) {
+    const n = norm(c.nome || "");
+    if (!n) continue;
+    if (s.includes(n) || n.includes(s)) return c;
+  }
+
+  // 3) aproximação por distância
+  let best = null,
+    bestD = 999;
+  for (const c of index.list) {
+    const n = norm(c.nome || "");
+    if (!n) continue;
+    const d = lev(s, n);
+    if (d < bestD) {
+      bestD = d;
+      best = c;
+    }
+  }
+  return bestD <= 6 ? best : null; // tolerância maior por conta de ruídos
 }
 
 /* ====================== Página ====================== */
@@ -209,37 +267,57 @@ export default function RendFiletadorExcelPage() {
   // ======= Estado do mapeamento manual =======
   const [mapModalOpen, setMapModalOpen] = useState(false);
   const [headerOptions, setHeaderOptions] = useState([]); // textos de cabeçalho
-  const [rowsParsed, setRowsParsed] = useState([]);       // linhas do excel
+  const [rowsParsed, setRowsParsed] = useState([]); // linhas do excel
   const [headerRowIdx, setHeaderRowIdx] = useState(0);
-  const [tempMap, setTempMap] = useState({ data: -1, filetador: -1, peixeSem: -1, fileProd: -1, correcao: -1, aprov: -1 });
+  const [tempMap, setTempMap] = useState({
+    data: -1,
+    filetador: -1,
+    peixeSem: -1,
+    fileProd: -1,
+    correcao: -1,
+    aprov: -1,
+  });
 
   /* ===== Carregar equipe (APENAS 'equipe_producao') ===== */
   useEffect(() => {
-    const unsub = onSnapshot(
-      query(collection(db, "equipe_producao")),
-      (snap) => {
-        const arr = snap.docs.map((d) => {
-          const x = d.data();
-          return {
-            id: d.id,
-            nome: String(x.nome ?? x.Nome ?? x.name ?? "").trim() || "(Sem nome)",
-            funcao: String(x.funcao ?? x.função ?? x.Funcao ?? x["Função"] ?? "").trim(),
-            matricula: String(x.matricula ?? x.Matricula ?? x.codigo ?? x.codigoBarras ?? "").trim(),
-          };
-        });
-        arr.sort((a, b) => a.nome.localeCompare(b.nome));
-        setColaboradores(arr);
-      }
-    );
+    const unsub = onSnapshot(query(collection(db, "equipe_producao")), (snap) => {
+      const arr = snap.docs.map((d) => {
+        const x = d.data();
+        return {
+          id: d.id,
+          nome: String(x.nome ?? x.Nome ?? x.name ?? "").trim() || "(Sem nome)",
+          funcao: String(x.funcao ?? x.função ?? x.Funcao ?? x["Função"] ?? "").trim(),
+          matricula: String(x.matricula ?? x.Matricula ?? x.codigo ?? x.codigoBarras ?? "")
+            .trim()
+            .replace(/^0+/, ""),
+        };
+      });
+      arr.sort((a, b) => a.nome.localeCompare(b.nome));
+      setColaboradores(arr);
+    });
     return () => unsub();
   }, []);
 
-  /* ===== Filtra somente quem é Filetador ===== */
+  /* ===== Select de filetador: filtro mais abrangente + fallback ===== */
   const listaParaSelect = useMemo(() => {
-    const isFilet = (f) => norm(f).includes("filetador");
-    return colaboradores
-      .filter((c) => isFilet(c.funcao))
-      .map((c) => ({ id: c.id, nome: c.matricula ? `${c.nome} (${c.matricula})` : c.nome }));
+    const isFilet = (f) => {
+      const s = norm(f);
+      return (
+        s.includes("filetador") ||
+        s.includes("filetag") ||
+        /operador(a)? de filet/.test(s) ||
+        s.includes("fil e") || // "filé" sem acento após normalização
+        s.includes("file")
+      );
+    };
+    let base = colaboradores.filter((c) => isFilet(c.funcao));
+    if (base.length === 0) base = colaboradores; // fallback: lista todos
+    return base
+      .map((c) => ({
+        id: c.id,
+        nome: c.matricula ? `${c.nome} (${c.matricula})` : c.nome,
+      }))
+      .sort((a, b) => a.nome.localeCompare(b.nome));
   }, [colaboradores]);
 
   /* ====== Lançamentos do mês ====== */
@@ -268,25 +346,39 @@ export default function RendFiletadorExcelPage() {
       where("dataISO", "<=", toISO(fim))
     );
     const unsub = onSnapshot(qRef, (snap) => {
-      const soma = {}, cont = {};
+      const soma = {},
+        cont = {};
       snap.forEach((d) => {
         const x = d.data();
         const dataISO = x.dataISO;
 
         let ratio = pctToRatio(
-          x.mediaDiariaPercent ?? x.mediaDiariaPct ?? x.mediaDiaria ??
-          x.percentualAprovacao ?? x.percentual ?? x.percentualAproveitado ??
-          x.aprovacaoSemEscamaPercent ?? x.aprovacaoSemEscama ?? 0
+          x.mediaDiariaPercent ??
+            x.mediaDiariaPct ??
+            x.mediaDiaria ??
+            x.percentualAprovacao ??
+            x.percentual ??
+            x.percentualAproveitado ??
+            x.aprovacaoSemEscamaPercent ??
+            x.aprovacaoSemEscama ??
+            0
         );
 
         if (!ratio || ratio <= 0) {
-          const cEscama = normalizeNumber(x.cEscama ?? x.comEscama ?? x.comEscamaKg ?? x.peixeComEscamaKg ?? 0);
-          const sEscama = normalizeNumber(x.sEscama ?? x.semEscama ?? x.semEscamaKg ?? x.peixeSemEscamaKg ?? 0);
+          const cEscama = normalizeNumber(
+            x.cEscama ?? x.comEscama ?? x.comEscamaKg ?? x.peixeComEscamaKg ?? 0
+          );
+          const sEscama = normalizeNumber(
+            x.sEscama ?? x.semEscama ?? x.semEscamaKg ?? x.peixeSemEscamaKg ?? 0
+          );
           if (cEscama > 0 && sEscama > 0) ratio = sEscama / cEscama;
         }
 
         if (!dataISO) return;
-        if (ratio > 0) { soma[dataISO] = (soma[dataISO] || 0) + ratio; cont[dataISO] = (cont[dataISO] || 0) + 1; }
+        if (ratio > 0) {
+          soma[dataISO] = (soma[dataISO] || 0) + ratio;
+          cont[dataISO] = (cont[dataISO] || 0) + 1;
+        }
       });
       const mapa = {};
       Object.keys(soma).forEach((d) => (mapa[d] = soma[d] / cont[d]));
@@ -334,7 +426,8 @@ export default function RendFiletadorExcelPage() {
   }, [linhas, aprovPorData]);
 
   const totais = useMemo(() => {
-    let peixeCom = 0, fileAj = 0;
+    let peixeCom = 0,
+      fileAj = 0;
     linhasCalculadas.forEach((i) => {
       peixeCom += i._auto?.peixeComEscamaKg || 0;
       fileAj += i._auto?.fileAjusteKg || 0;
@@ -366,7 +459,12 @@ export default function RendFiletadorExcelPage() {
       fileProduzidoKg: normalizeNumber(fileProduzidoKg),
       correcaoKg: normalizeNumber(correcaoKg),
     });
-    setForm((s) => ({ ...s, peixeSemEscamaKg: "", fileProduzidoKg: "", correcaoKg: "" }));
+    setForm((s) => ({
+      ...s,
+      peixeSemEscamaKg: "",
+      fileProduzidoKg: "",
+      correcaoKg: "",
+    }));
   };
 
   const editarLinha = async (id, campos) => {
@@ -392,30 +490,42 @@ export default function RendFiletadorExcelPage() {
       alert("Selecione um arquivo primeiro.");
       return;
     }
-    const buf = await file.arrayBuffer();
-    const wb = XLSX.read(buf);
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf);
 
-    const wanted =
-      wb.SheetNames.find((n) => norm(n).includes("rend") && norm(n).includes("filet")) ??
-      wb.SheetNames[0];
-    const ws = wb.Sheets[wanted];
+      const wanted =
+        wb.SheetNames.find(
+          (n) => norm(n).includes("rend") && norm(n).includes("filet")
+        ) ?? wb.SheetNames[0];
+      const ws = wb.Sheets[wanted];
 
-    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
-    const hdrIdx = findHeaderRow(rows);
-    const headerMerged = mergeHeaderRows(rows, hdrIdx);
-    let autoMap = buildColumnMap(headerMerged);
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+      const hdrIdx = findHeaderRow(rows);
+      const headerMerged = mergeHeaderRows(rows, hdrIdx);
+      let autoMap = buildColumnMap(headerMerged);
 
-    // Se não reconheceu Data ou Filetador, abre mapeamento manual
-    if (autoMap.data === -1 || autoMap.filetador === -1) {
-      setHeaderOptions(headerMerged);
-      setRowsParsed(rows);
-      setHeaderRowIdx(hdrIdx);
-      setTempMap(autoMap);
-      setMapModalOpen(true);
-      return; // importa depois que confirmar o modal
+      // Se não reconheceu Data ou Filetador, abre mapeamento manual
+      if (autoMap.data === -1 || autoMap.filetador === -1) {
+        setHeaderOptions(
+          headerMerged.map((h, i) => h || `(coluna ${i + 1})`)
+        );
+        setRowsParsed(rows);
+        setHeaderRowIdx(hdrIdx);
+        setTempMap(autoMap);
+        setMapModalOpen(true);
+        return; // importa depois que confirmar o modal
+      }
+
+      await importarComMapa(rows, hdrIdx, autoMap);
+    } catch (err) {
+      console.error(err);
+      alert(
+        "Não foi possível ler o arquivo. Feche qualquer programa que o esteja usando e selecione novamente."
+      );
+    } finally {
+      setSelectedFile(null); // evita reaproveitar referência após HMR
     }
-
-    await importarComMapa(rows, hdrIdx, autoMap);
   };
 
   async function importarComMapa(rows, hdrIdx, map) {
@@ -489,12 +599,15 @@ export default function RendFiletadorExcelPage() {
       setMapModalOpen(false);
       await importarComMapa(rowsParsed, headerRowIdx, localMap);
       // limpa estados temporários
-      setHeaderOptions([]); setRowsParsed([]); setTempMap({ data: -1, filetador: -1, peixeSem: -1, fileProd: -1, correcao: -1, aprov: -1 });
+      setHeaderOptions([]);
+      setRowsParsed([]);
+      setTempMap({ data: -1, filetador: -1, peixeSem: -1, fileProd: -1, correcao: -1, aprov: -1 });
     };
 
     const close = () => {
       setMapModalOpen(false);
-      setHeaderOptions([]); setRowsParsed([]); // descarta
+      setHeaderOptions([]);
+      setRowsParsed([]); // descarta
     };
 
     return (
@@ -523,7 +636,9 @@ export default function RendFiletadorExcelPage() {
                 >
                   <option value={-1}>— Não usar —</option>
                   {headerOptions.map((h, i) => (
-                    <option key={i} value={i}>{h || `(coluna ${i + 1})`}</option>
+                    <option key={i} value={i}>
+                      {h || `(coluna ${i + 1})`}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -531,8 +646,12 @@ export default function RendFiletadorExcelPage() {
           </div>
 
           <div className="flex gap-2 mt-4 justify-end">
-            <button className="btn-ghost" onClick={close}>Cancelar</button>
-            <button className="btn-primary" onClick={confirm}>Importar</button>
+            <button className="btn-ghost" onClick={close}>
+              Cancelar
+            </button>
+            <button className="btn-primary" onClick={confirm}>
+              Importar
+            </button>
           </div>
         </div>
       </div>
@@ -559,46 +678,91 @@ export default function RendFiletadorExcelPage() {
       <tr className="border-b">
         <td className="p-2">
           {edit ? (
-            <input type="date" className="input" value={loc.dataISO} onChange={(e) => setLoc({ ...loc, dataISO: e.target.value })}/>
-          ) : (item.dataISO)}
+            <input
+              type="date"
+              className="input"
+              value={loc.dataISO}
+              onChange={(e) => setLoc({ ...loc, dataISO: e.target.value })}
+            />
+          ) : (
+            item.dataISO
+          )}
         </td>
 
         <td className="p-2">
           {edit ? (
-            <select className="input" value={loc.filetadorId} onChange={(e) => setLoc({ ...loc, filetadorId: e.target.value })}>
+            <select
+              className="input"
+              value={loc.filetadorId}
+              onChange={(e) => setLoc({ ...loc, filetadorId: e.target.value })}
+            >
               <option value="">Selecione…</option>
-              {listaParaSelect.map((c) => (<option key={c.id} value={c.id}>{c.nome}</option>))}
+              {listaParaSelect.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nome}
+                </option>
+              ))}
             </select>
-          ) : (item.filetadorNome)}
+          ) : (
+            item.filetadorNome
+          )}
         </td>
 
         <td className="p-2">
           {edit ? (
-            <input type="number" step="0.01" className="input" value={loc.peixeSemEscamaKg}
-                   onChange={(e) => setLoc({ ...loc, peixeSemEscamaKg: e.target.value })}/>
-          ) : (Number(item.peixeSemEscamaKg || 0).toFixed(2))}
+            <input
+              type="number"
+              step="0.01"
+              className="input"
+              value={loc.peixeSemEscamaKg}
+              onChange={(e) => setLoc({ ...loc, peixeSemEscamaKg: e.target.value })}
+            />
+          ) : (
+            Number(item.peixeSemEscamaKg || 0).toFixed(2)
+          )}
         </td>
 
         <td className="p-2">
           {edit ? (
-            <input type="number" step="0.01" className="input" value={loc.fileProduzidoKg}
-                   onChange={(e) => setLoc({ ...loc, fileProduzidoKg: e.target.value })}/>
-          ) : (Number(item.fileProduzidoKg || 0).toFixed(2))}
+            <input
+              type="number"
+              step="0.01"
+              className="input"
+              value={loc.fileProduzidoKg}
+              onChange={(e) => setLoc({ ...loc, fileProduzidoKg: e.target.value })}
+            />
+          ) : (
+            Number(item.fileProduzidoKg || 0).toFixed(2)
+          )}
         </td>
 
         <td className="p-2">
           {edit ? (
-            <input type="number" step="0.01" className="input" placeholder="% aprov. (opcional)"
-                   value={loc.aprovSemEscamaPct}
-                   onChange={(e) => setLoc({ ...loc, aprovSemEscamaPct: e.target.value })}/>
-          ) : (`${(item._auto?.aprovPct || 0).toFixed(2)}%`)}
+            <input
+              type="number"
+              step="0.01"
+              className="input"
+              placeholder="% aprov. (opcional)"
+              value={loc.aprovSemEscamaPct}
+              onChange={(e) => setLoc({ ...loc, aprovSemEscamaPct: e.target.value })}
+            />
+          ) : (
+            `${(item._auto?.aprovPct || 0).toFixed(2)}%`
+          )}
         </td>
 
         <td className="p-2">
           {edit ? (
-            <input type="number" step="0.01" className="input" value={loc.correcaoKg}
-                   onChange={(e) => setLoc({ ...loc, correcaoKg: e.target.value })}/>
-          ) : (Number(item.correcaoKg || 0).toFixed(2))}
+            <input
+              type="number"
+              step="0.01"
+              className="input"
+              value={loc.correcaoKg}
+              onChange={(e) => setLoc({ ...loc, correcaoKg: e.target.value })}
+            />
+          ) : (
+            Number(item.correcaoKg || 0).toFixed(2)
+          )}
         </td>
 
         <td className="p-2">{Number(item._auto?.peixeComEscamaKg || 0).toFixed(2)}</td>
@@ -608,13 +772,21 @@ export default function RendFiletadorExcelPage() {
         <td className="p-2">
           {!edit ? (
             <div className="flex gap-2">
-              <button className="btn-secondary" onClick={() => setEdit(true)}>Editar</button>
-              <button className="btn-danger" onClick={() => excluirLinha(item.id)}>Excluir</button>
+              <button className="btn-secondary" onClick={() => setEdit(true)}>
+                Editar
+              </button>
+              <button className="btn-danger" onClick={() => excluirLinha(item.id)}>
+                Excluir
+              </button>
             </div>
           ) : (
             <div className="flex gap-2">
-              <button className="btn-primary" onClick={salvar}>Salvar</button>
-              <button className="btn-ghost" onClick={() => setEdit(false)}>Cancelar</button>
+              <button className="btn-primary" onClick={salvar}>
+                Salvar
+              </button>
+              <button className="btn-ghost" onClick={() => setEdit(false)}>
+                Cancelar
+              </button>
             </div>
           )}
         </td>
@@ -628,21 +800,42 @@ export default function RendFiletadorExcelPage() {
 
       <h1 className="text-2xl font-bold flex items-center justify-between">
         Rend. filetador (excel)
-        <span className="text-sm font-normal text-gray-500">Mês: {format(monthDate, "MM/yyyy")}</span>
+        <span className="text-sm font-normal text-gray-500">
+          Mês: {format(monthDate, "MM/yyyy")}
+        </span>
       </h1>
 
       {/* Importar Excel */}
       <div className="mt-4">
         <label className="label">Importar Excel</label>
         <div className="flex flex-col sm:flex-row gap-2">
-          <input type="file" accept=".xlsx,.xls" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} className="input"/>
+          <input
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+            className="input"
+          />
         </div>
         <div className="flex gap-2 mt-2">
-          <button type="button" className="btn-primary" onClick={() => importarExcel(selectedFile)} disabled={!selectedFile}>Importar</button>
-          <button type="button" className="btn-ghost" onClick={() => setSelectedFile(null)}>Limpar arquivo</button>
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={() => importarExcel(selectedFile)}
+            disabled={!selectedFile}
+          >
+            Importar
+          </button>
+          <button
+            type="button"
+            className="btn-ghost"
+            onClick={() => setSelectedFile(null)}
+          >
+            Limpar arquivo
+          </button>
         </div>
         <p className="text-xs text-gray-500 mt-1">
-          O select de <b>Filetador</b> lê <b>equipe_producao</b> (campo <code>nome</code>) e lista quem tem <code>funcao</code> contendo “Filetador”.
+          O select de <b>Filetador</b> lê <b>equipe_producao</b> e aceita variações de função
+          (Filetador, Operador de Filetagem, etc.). Se não houver ninguém marcado, lista todos.
         </p>
       </div>
 
@@ -652,27 +845,65 @@ export default function RendFiletadorExcelPage() {
         <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
           <div>
             <label className="label">Data *</label>
-            <input type="date" name="dataISO" value={form.dataISO} onChange={onChange} className="input" required />
+            <input
+              type="date"
+              name="dataISO"
+              value={form.dataISO}
+              onChange={onChange}
+              className="input"
+              required
+            />
           </div>
           <div>
             <label className="label">Filetador *</label>
-            <select name="filetadorId" className="input" value={form.filetadorId} onChange={onChange} required>
+            <select
+              name="filetadorId"
+              className="input"
+              value={form.filetadorId}
+              onChange={onChange}
+              required
+            >
               <option value="">Selecione…</option>
-              {listaParaSelect.map((c) => (<option key={c.id} value={c.id}>{c.nome}</option>))}
+              {listaParaSelect.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nome}
+                </option>
+              ))}
             </select>
             <p className="text-xs text-gray-500">1 lançamento por filetador/dia.</p>
           </div>
           <div>
             <label className="label">Peixe recebido sem escama (kg)</label>
-            <input type="number" step="0.01" name="peixeSemEscamaKg" value={form.peixeSemEscamaKg} onChange={onChange} className="input" />
+            <input
+              type="number"
+              step="0.01"
+              name="peixeSemEscamaKg"
+              value={form.peixeSemEscamaKg}
+              onChange={onChange}
+              className="input"
+            />
           </div>
           <div>
             <label className="label">Filé produzido (kg)</label>
-            <input type="number" step="0.01" name="fileProduzidoKg" value={form.fileProduzidoKg} onChange={onChange} className="input" />
+            <input
+              type="number"
+              step="0.01"
+              name="fileProduzidoKg"
+              value={form.fileProduzidoKg}
+              onChange={onChange}
+              className="input"
+            />
           </div>
           <div>
             <label className="label">Correção (kg)</label>
-            <input type="number" step="0.01" name="correcaoKg" value={form.correcaoKg} onChange={onChange} className="input" />
+            <input
+              type="number"
+              step="0.01"
+              name="correcaoKg"
+              value={form.correcaoKg}
+              onChange={onChange}
+              className="input"
+            />
           </div>
         </div>
 
@@ -717,7 +948,9 @@ export default function RendFiletadorExcelPage() {
           <tbody>
             {linhasCalculadas.length === 0 ? (
               <tr>
-                <td className="p-4 text-gray-500" colSpan={10}>Sem lançamentos para o mês atual.</td>
+                <td className="p-4 text-gray-500" colSpan={10}>
+                  Sem lançamentos para o mês atual.
+                </td>
               </tr>
             ) : (
               linhasCalculadas.map((it) => <LinhaTabela key={it.id} item={it} />)
